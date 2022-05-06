@@ -9,7 +9,8 @@ use std::{
     path::Path
 };
 use rayon::prelude::*;
-use regex::Regex;
+use regex::{Regex, Captures};
+use rand::{SeedableRng, Rng};
 
 fn main() {
     let opt = Job::from_args();
@@ -54,6 +55,28 @@ fn main() {
             }
         );
     
+    let re = Regex::new(r"\$RANDOM")
+        .unwrap();
+
+
+    let mut rng = rand_pcg::Pcg64::from_entropy();
+    let mut replacer = move |_: &Captures|
+    {
+        let num = rng.gen::<u32>();
+        format!("{num}")
+    };
+    commands
+        .iter_mut()
+        .for_each(
+            |val|
+            {
+                let cow = re.replace_all(
+                    val, 
+                    &mut replacer
+                );
+                *val = cow.into_owned();
+            }
+        );
 
     let mut error = false;
     for index in 0..commands.len()
@@ -79,25 +102,20 @@ fn main() {
                 
                 let dir = if let Some(p) = &exec_path
                 {
-                    if opt.copy_back{
-                        let mut path = PathBuf::from(p);
-                        
-                        let dir_name = if let Some(n) = &opt.tmp_dir
-                        {
-                            format!("{n}_{index}")
-                        } else {
-                            format!("{index}")
-                        };
-                        path.push(dir_name);
-                        println!("{:?}", path);
+                    
+                    let mut path = PathBuf::from(p);
+                    
+                    if let Some(n) = &opt.tmp_dir
+                    {
+                        path.push(format!("{n}_{index}"));
+                        println!("creating {:?}", path);
                         std::fs::create_dir(&path)
                             .expect("unable to create dir");
-                        cmd.current_dir(&path);
-                        Some(path)
-                    } else {
-                        cmd.current_dir(p);
-                        None
                     }
+ 
+                    cmd.current_dir(&path);
+                    Some(path)
+                    
                 } else {
                     None
                 };
@@ -125,27 +143,38 @@ fn main() {
                     buf.write_all(&output.stderr).unwrap();  
                 }
 
-                if let Some(d) = dir {
-                    let current = std::env::current_dir()
-                        .expect("current dir invalid");
-
-                    if !move_dir(&d, &current)
-                    {
-                        let last = d.file_name().unwrap().to_str().unwrap();
-                        for i in 0..10 {
-                            eprintln!("try_fallback {i}");
-                            let mut n = current.clone();
-                            n.push(format!("{last}_{i}"));
-                            if move_dir(&d, n) 
-                            {
-                                eprintln!("Success");
-                                break;
+                if opt.copy_back && opt.tmp_dir.is_some() {
+                    if let Some(d) = dir {
+                        let current = std::env::current_dir()
+                            .expect("current dir invalid");
+    
+                        if !move_dir(&d, &current)
+                        {
+                            let last = d.file_name().unwrap().to_str().unwrap();
+                            for i in 0..10 {
+                                eprintln!("try_fallback {i}");
+                                let mut n = current.clone();
+                                n.push(format!("{last}_{i}"));
+                                if move_dir(&d, n) 
+                                {
+                                    eprintln!("Success");
+                                    break;
+                                }
                             }
                         }
                     }
                 }
+                
             }
         );
+
+    if opt.tmp_dir.is_none() && opt.copy_back && opt.execution_path.is_some()
+    {
+        let ex_path = opt.execution_path.unwrap();
+        if !move_files_and_subdir(&ex_path, cwd){
+            eprintln!("ERROR: Move failed :/")
+        }
+    }
 }
 
 pub fn check_dir_errors(param: &Job, index: usize, exec_path: &Option<PathBuf>) -> bool
@@ -174,6 +203,30 @@ pub fn check_dir_errors(param: &Job, index: usize, exec_path: &Option<PathBuf>) 
         } 
     }
     true
+}
+
+fn move_files_and_subdir(src: &str, dst: &str) -> bool
+{
+    let cmd = format!("mv {src}/* {dst}");
+    println!("{}", cmd);
+    let move_cmd = Command::new("sh")
+        .arg("-c")
+        .arg(&cmd)
+        .spawn()
+        .unwrap()
+        .wait();
+
+    
+    match move_cmd {
+        Ok(status) => {
+            status.success()
+        },
+        Err(e) => 
+        {
+            eprintln!("error in move: {e}");
+            false
+        }
+    }
 }
 
 fn move_dir<P1, P2>(src: P1, dst: P2) -> bool
@@ -206,10 +259,16 @@ where P1: AsRef<Path>,
 /// Created by Yannick Feld
 /// 
 /// Used to run commands that are stored in a script in parallel.
+/// The order of the commands is not guaranteed.
+/// Commands are executed in shell (sh) not bash
 /// 
 /// Note: all occurences of §cwd§ will be replaced by the directory this program was calle in!
+/// Also $RANDOM will be replaced with a randomly drawn u32
+/// 
 pub struct Job{
-    /// How many threads to use?
+    /// Number of commands that are run in parallel.
+    /// If not given the program will try to figure out the appropriate 
+    /// ammount itself
     #[structopt(short)]
     pub j: Option<NonZeroUsize>,
 
@@ -218,15 +277,23 @@ pub struct Job{
     pub path: String,
 
     /// where should the command be executed?
+    /// Default: Current directroy
     #[structopt(short, long)]
     pub execution_path: Option<String>,
 
-    /// How should temporary directorys be called?
-    /// Will be appended with line number
+    /// Temporary directory that is created in the execution directory.
+    /// All commands will be run in the temporary directory instead.
+    /// Every command gets a unique directory, as it is appended with the execution index
+    /// that corresponds to the line number in the original script
+    /// 
+    /// The option copy back will now copy the whole temporary directory each time the 
+    /// corresponding command finishes. This is useful if the commands you want to execute 
+    /// may produce output that would interfere with one another, e.g., attempt overwriting 
     #[structopt(short, long)]
     pub tmp_dir: Option<String>,
 
-    /// Copy all the files from execution_path
+    /// Copy all the files from execution_path to calling directory after all commands finish.
+    /// CAUTION: This will move all files and subdirectorys of the execution directory! 
     #[structopt(short, long)]
-    pub copy_back: bool
+    pub copy_back: bool,
 }
