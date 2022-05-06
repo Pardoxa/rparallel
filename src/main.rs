@@ -126,7 +126,7 @@ fn main() {
                     .expect("failed to execute process");
 
                 let name = format!("log_{index}");
-                if !output.stdout.is_empty()
+                if !output.stdout.is_empty() && !opt.no_log
                 {
                     let name = format!("{name}.stdout");
                     let file = File::create(name)
@@ -135,8 +135,8 @@ fn main() {
                     buf.write_all(&output.stdout).unwrap();
                 }
 
-                if !output.stderr.is_empty(){
-                    let name = format!("{name}.stdedd");
+                if !output.stderr.is_empty() && !opt.no_log {
+                    let name = format!("{name}.stderr");
                     let file = File::create(name)
                         .expect("unable to create file");
                     let mut buf = BufWriter::new(file);
@@ -208,6 +208,7 @@ pub fn check_dir_errors(param: &Job, index: usize, exec_path: &Option<PathBuf>) 
 fn move_files_and_subdir(src: &str, dst: &str) -> bool
 {
     let cmd = format!("mv {src}/* {dst}");
+
     println!("{}", cmd);
     let move_cmd = Command::new("sh")
         .arg("-c")
@@ -296,4 +297,8 @@ pub struct Job{
     /// CAUTION: This will move all files and subdirectorys of the execution directory! 
     #[structopt(short, long)]
     pub copy_back: bool,
+
+    /// ignore stdout and stderr of commands, don't create log files for that
+    #[structopt(short, long)]
+    pub no_log: bool,
 }
