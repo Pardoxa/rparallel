@@ -59,7 +59,12 @@ fn main() {
         .unwrap();
 
 
-    let mut rng = rand_pcg::Pcg64::from_entropy();
+    let mut rng = match opt.seed
+    {
+        None => rand_pcg::Pcg64::from_entropy(),
+        Some(s) => rand_pcg::Pcg64::seed_from_u64(s)
+    };
+    
     let mut replacer = move |_: &Captures|
     {
         let num = rng.gen::<u32>();
@@ -263,8 +268,8 @@ where P1: AsRef<Path>,
 /// The order of the commands is not guaranteed.
 /// Commands are executed in shell (sh) not bash
 /// 
-/// Note: all occurences of §cwd§ will be replaced by the directory this program was calle in!
-/// Also $RANDOM will be replaced with a randomly drawn u32
+/// Note: all occurences of §cwd§ will be replaced by the directory this program was called in!
+/// Also $RANDOM will be replaced with a randomly drawn u32 (unsigned 32bit integer)
 /// 
 pub struct Job{
     /// Number of commands that are run in parallel.
@@ -301,4 +306,9 @@ pub struct Job{
     /// ignore stdout and stderr of commands, don't create log files for that
     #[structopt(short, long)]
     pub no_log: bool,
+
+    /// Seed for the random number generator used to replace $RANDOM.
+    /// If nothing is given, the seed will be generated from entropy
+    #[structopt(short, long)]
+    pub seed: Option<u64>
 }
