@@ -1,4 +1,5 @@
 use structopt::StructOpt;
+use std::env::current_dir;
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::{
@@ -8,6 +9,7 @@ use std::{
     path::Path
 };
 use rayon::prelude::*;
+use regex::Regex;
 
 fn main() {
     let opt = Job::from_args();
@@ -20,7 +22,7 @@ fn main() {
         .expect("unable to open file");
     let reader = BufReader::new(file);
 
-    let commands: Vec<_> = reader.lines()
+    let mut commands: Vec<_> = reader.lines()
         .filter_map(
             |l|
             l.ok()
@@ -36,6 +38,22 @@ fn main() {
         .map(std::fs::canonicalize)
         .map(|r| r.unwrap());
         
+    let cwd = current_dir().unwrap();
+    let cwd = cwd.to_str().unwrap();
+
+    let re = Regex::new(r"§cwd§")
+        .unwrap();
+
+    commands
+        .iter_mut()
+        .for_each(
+            |val|
+            {
+                let cow = re.replace_all(val, cwd);
+                *val = cow.into_owned();
+            }
+        );
+    
 
     let mut error = false;
     for index in 0..commands.len()
@@ -187,7 +205,9 @@ where P1: AsRef<Path>,
 #[derive(Debug, StructOpt, Clone)]
 /// Created by Yannick Feld
 /// 
-/// Used to run commands that are stored in a script in parallel
+/// Used to run commands that are stored in a script in parallel.
+/// 
+/// Note: all occurences of §cwd§ will be replaced by the directory this program was calle in!
 pub struct Job{
     /// How many threads to use?
     #[structopt(short)]
