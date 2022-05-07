@@ -38,6 +38,22 @@ fn main() {
         .clone()
         .map(std::fs::canonicalize)
         .map(|r| r.unwrap());
+
+    
+    let exec_path_is_empty = exec_path.as_ref().map(
+        |p|
+        {
+            p.read_dir().expect("execution path does not exist!").next().is_none()
+        }
+    );
+
+    if let Some(is_empty) = exec_path_is_empty
+    {
+        if !opt.force && !is_empty && opt.move_back && opt.tmp_dir.is_none() {
+            eprintln!("WARNING: execution directory is not empty before executing any command but requested to move all files in execution directory.\
+            This could be dangerous. Thus MOVE of files will be SKIPPED. If this was not a mistake, the behavior can be changed by setting the --force flag.")
+        }
+    }
         
     let cwd = current_dir().unwrap();
     let cwd = cwd.to_str().unwrap();
@@ -167,7 +183,7 @@ fn main() {
                     buf.write_all(&output.stderr).unwrap();  
                 }
 
-                if opt.copy_back && opt.tmp_dir.is_some() {
+                if opt.move_back && opt.tmp_dir.is_some() {
                     if let Some(d) = dir {
                         let current = std::env::current_dir()
                             .expect("current dir invalid");
@@ -192,11 +208,16 @@ fn main() {
             }
         );
 
-    if opt.tmp_dir.is_none() && opt.copy_back && opt.execution_path.is_some()
+    if opt.tmp_dir.is_none() && opt.move_back
     {
-        let ex_path = opt.execution_path.unwrap();
-        if !move_files_and_subdir(&ex_path, cwd){
-            eprintln!("ERROR: Move failed :/")
+        // if execution_path is None, exec_path_is_empty will also be None
+        if let Some(is_empty) = exec_path_is_empty{
+            if is_empty || opt.force{
+                let ex_path = opt.execution_path.unwrap();
+                if !move_files_and_subdir(&ex_path, cwd){
+                    eprintln!("ERROR: Move failed :-/")
+                }
+            }
         }
     }
 }
@@ -209,7 +230,7 @@ pub fn check_dir_errors(param: &Job, index: usize, exec_path: &Option<PathBuf>) 
         {
             return false;
         }
-        if param.copy_back{
+        if param.move_back{
             let mut path = PathBuf::from(p);
             
             let dir_name = if let Some(n) = &param.tmp_dir
@@ -311,16 +332,16 @@ pub struct Job{
     /// Every command gets a unique directory, as it is appended with the execution index
     /// that corresponds to the line number in the original script
     /// 
-    /// The option copy back will now copy the whole temporary directory each time the 
+    /// The option move_back will now move the whole temporary directory each time the 
     /// corresponding command finishes. This is useful if the commands you want to execute 
     /// may produce output that would interfere with one another, e.g., attempt overwriting 
     #[structopt(short, long)]
     pub tmp_dir: Option<String>,
 
-    /// Copy all the files from execution_path to calling directory after all commands finish.
+    /// move all the files from execution_path to calling directory after all commands finish.
     /// CAUTION: This will move all files and subdirectorys of the execution directory! 
     #[structopt(short, long)]
-    pub copy_back: bool,
+    pub move_back: bool,
 
     /// ignore stdout and stderr of commands, don't create log files for that
     #[structopt(short, long)]
@@ -347,5 +368,10 @@ pub struct Job{
     /// Changes behavior of $RANDOM to be exchanged for an u64 instead,
     /// i.e., an 64 bit unsigned integer
     #[structopt(long)]
-    pub u64: bool
+    pub u64: bool,
+
+    /// Force the move of files even if the execution path was not 
+    /// empty before executing any command
+    #[structopt(long, short)]
+    pub force: bool
 }
