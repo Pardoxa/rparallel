@@ -126,7 +126,7 @@ fn main() {
                 };
 
                 
-                let name = format!("log_{index}");
+                let name = format!("{}_{index}", opt.logname);
                 if opt.print {
                     cmd.stdout(std::process::Stdio::inherit());
                     cmd.stderr(std::process::Stdio::inherit());
@@ -322,5 +322,13 @@ pub struct Job{
     /// Print output to stdout and stderr instead of creating a logfile 
     /// for each command
     #[structopt(long)]
-    pub print: bool
+    pub print: bool,
+
+    /// Name of the logfiles created for each command.
+    /// If the flag --print is not set each command will print 
+    /// a logfile called {logname}_{command_index}.stdout and .stderr
+    /// These will be created whenever a command finishes, if 
+    /// said command did output anything to stdout (stderr)
+    #[structopt(long, short, default_value = "log")]
+    pub logname: String
 }
