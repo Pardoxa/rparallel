@@ -21,11 +21,11 @@ fn main() {
         rayon::ThreadPoolBuilder::new().num_threads(j.get()).build_global().unwrap();
     }
 
-    let file = match File::open(&opt.commands)
+    let file = match File::open(&opt.command_file)
     {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("Requested command file: {}", &opt.commands);
+            eprintln!("Requested command file: {}", &opt.command_file);
             eprintln!("ERROR: {:#}", e);
             std::process::exit(2);
         }
@@ -364,7 +364,7 @@ pub struct Job{
     pub j: Option<NonZeroUsize>,
 
     /// (path to) file of which every line is to be executed in the shell (sh)
-    pub commands: String,
+    pub command_file: String,
 
     /// where should the command be executed?
     /// Default: Current directroy
