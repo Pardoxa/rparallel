@@ -1,16 +1,18 @@
-use structopt::StructOpt;
-use std::env::current_dir;
-use std::num::NonZeroUsize;
-use std::path::PathBuf;
-use std::{
-    fs::File,
-    io::{BufRead, BufReader, Write, BufWriter},
-    process::{Command, Stdio},
-    path::Path
+use {
+    structopt::StructOpt,
+    std::{
+        fs::File,
+        io::{BufRead, BufReader, Write, BufWriter},
+        process::{Command, Stdio},
+        path::Path,
+        env::current_dir,
+        num::NonZeroUsize,
+        path::PathBuf
+    },
+    rayon::prelude::*,
+    regex::{Regex, Captures},
+    rand::{SeedableRng, Rng}
 };
-use rayon::prelude::*;
-use regex::{Regex, Captures};
-use rand::{SeedableRng, Rng};
 
 fn main() {
     let opt = Job::from_args();
@@ -19,11 +21,11 @@ fn main() {
         rayon::ThreadPoolBuilder::new().num_threads(j.get()).build_global().unwrap();
     }
 
-    let file = match File::open(&opt.path)
+    let file = match File::open(&opt.commands)
     {
         Ok(f) => f,
         Err(e) => {
-            eprintln!("Requested command file: {}", &opt.path);
+            eprintln!("Requested command file: {}", &opt.commands);
             eprintln!("ERROR: {:#}", e);
             std::process::exit(2);
         }
@@ -361,9 +363,8 @@ pub struct Job{
     #[structopt(short)]
     pub j: Option<NonZeroUsize>,
 
-    /// file of which every line is to be executed
-    #[structopt(short, long)]
-    pub path: String,
+    /// (path to) file of which every line is to be executed in the shell (sh)
+    pub commands: String,
 
     /// where should the command be executed?
     /// Default: Current directroy
