@@ -64,7 +64,7 @@ fn main() {
         None => rand_pcg::Pcg64::from_entropy(),
         Some(s) => rand_pcg::Pcg64::seed_from_u64(s)
     };
-    
+
     let mut replacer = move |_: &Captures|
     {
         let num = rng.gen::<u32>();
@@ -125,13 +125,20 @@ fn main() {
                     None
                 };
 
+                
+                let name = format!("log_{index}");
+                if opt.print {
+                    cmd.stdout(std::process::Stdio::inherit());
+                    cmd.stderr(std::process::Stdio::inherit());
+                }
+
                 let output = cmd.arg("-c")
                     .arg(command)
                     .output()
                     .expect("failed to execute process");
 
-                let name = format!("log_{index}");
-                if !output.stdout.is_empty() && !opt.no_log
+                
+                if !output.stdout.is_empty() && !opt.no_log && !opt.print
                 {
                     let name = format!("{name}.stdout");
                     let file = File::create(name)
@@ -140,7 +147,7 @@ fn main() {
                     buf.write_all(&output.stdout).unwrap();
                 }
 
-                if !output.stderr.is_empty() && !opt.no_log {
+                if !output.stderr.is_empty() && !opt.no_log && !opt.print {
                     let name = format!("{name}.stderr");
                     let file = File::create(name)
                         .expect("unable to create file");
@@ -310,5 +317,10 @@ pub struct Job{
     /// Seed for the random number generator used to replace $RANDOM.
     /// If nothing is given, the seed will be generated from entropy
     #[structopt(short, long)]
-    pub seed: Option<u64>
+    pub seed: Option<u64>,
+
+    /// Print output to stdout and stderr instead of creating a logfile 
+    /// for each command
+    #[structopt(long)]
+    pub print: bool
 }
