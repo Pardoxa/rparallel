@@ -19,8 +19,16 @@ fn main() {
         rayon::ThreadPoolBuilder::new().num_threads(j.get()).build_global().unwrap();
     }
 
-    let file = File::open(&opt.path)
-        .expect("unable to open file");
+    let file = match File::open(&opt.path)
+    {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Requested command file: {}", &opt.path);
+            eprintln!("ERROR: {:#}", e);
+            std::process::exit(2);
+        }
+    };
+
     let reader = BufReader::new(file);
 
     let mut commands: Vec<_> = reader.lines()
