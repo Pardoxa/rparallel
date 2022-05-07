@@ -65,10 +65,22 @@ fn main() {
         Some(s) => rand_pcg::Pcg64::seed_from_u64(s)
     };
 
-    let mut replacer = move |_: &Captures|
-    {
-        let num = rng.gen::<u32>();
-        format!("{num}")
+    let mut replacer: Box<dyn FnMut (&Captures) -> String> = if opt.u64{
+        Box::new(
+            move |_: &Captures|
+            {
+                let num = rng.gen::<u64>();
+                format!("{num}")
+            }
+        )
+    } else {
+        Box::new(
+            move |_: &Captures|
+            {
+                let num = rng.gen::<u32>();
+                format!("{num}")
+            }
+        )
     };
     commands
         .iter_mut()
@@ -330,5 +342,10 @@ pub struct Job{
     /// These will be created whenever a command finishes, if 
     /// said command did output anything to stdout (stderr)
     #[structopt(long, short, default_value = "log")]
-    pub logname: String
+    pub logname: String,
+
+    /// Changes behavior of $RANDOM to be exchanged for an u64 instead,
+    /// i.e., an 64 bit unsigned integer
+    #[structopt(long)]
+    pub u64: bool
 }
