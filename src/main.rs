@@ -371,23 +371,27 @@ pub struct Job{
     #[structopt(short, long)]
     pub execution_path: Option<String>,
 
-    /// Temporary directory that is created in the execution directory.
-    /// All commands will be run in the temporary directory instead.
-    /// Every command gets a unique directory, as it is appended with the execution index
-    /// that corresponds to the line number in the original script
+    /// Stem name of temporary directories that are created in the execution directory.
+    /// All commands will be run in their respective temporary directory instead.
+    /// Every command gets a unique directory, as the stem name is appended with the execution index
+    /// that corresponds to the line number in the command file (though blank lines or lines starting with # are not counted)
     /// 
-    /// The option move_back will now move the whole temporary directory each time the 
+    /// The option move_back will now move the temporary directory of a command each time the 
     /// corresponding command finishes. This is useful if the commands you want to execute 
-    /// may produce output that would interfere with one another, e.g., attempt overwriting 
+    /// may produce output that would interfere with one another, e.g., by having the same names 
     #[structopt(short, long)]
     pub tmp_dir: Option<String>,
 
     /// move all the files from execution_path to calling directory after all commands finish.
     /// CAUTION: This will move all files and subdirectorys of the execution directory! 
+    /// 
+    /// If option tmp_dir is used, it will only move the newly create sub directories, in which 
+    /// the commands were executed
     #[structopt(short, long)]
     pub move_back: bool,
 
-    /// ignore stdout and stderr of commands, don't create log files for that.
+    /// Ignore stdout and stderr of commands, don't create log files.
+    /// The --print flag will ignore this option
     #[structopt(short, long)]
     pub no_log: bool,
 
@@ -399,7 +403,7 @@ pub struct Job{
     /// Print output to stdout and stderr instead of creating a logfile 
     /// for each command
     /// 
-    /// Note: print also writes output instantly, without buffering,
+    /// Note: print writes output instantly, without buffering,
     /// similar to the behavior one can get for the logfiles with the 
     /// --instant-log flag
     #[structopt(long)]
