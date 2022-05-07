@@ -11,7 +11,6 @@ use std::{
 use rayon::prelude::*;
 use regex::{Regex, Captures};
 use rand::{SeedableRng, Rng};
-//use std::os::unix::io::{AsRawFd, FromRawFd};
 
 fn main() {
     let opt = Job::from_args();
@@ -177,16 +176,20 @@ fn main() {
 
                 
                 let name = format!("{}_{index}", opt.logname);
+                
                 if opt.print {
                     cmd.stdout(std::process::Stdio::inherit());
                     cmd.stderr(std::process::Stdio::inherit());
                 } else if opt.no_log {
-                    // let f = std::io::sink();
-                    // let fd = f.as_raw_fd();
-                    // // from_raw_fd is only considered unsafe if the file is used for mmap
-                    // let out = unsafe {Stdio::from_raw_fd(fd)};
                     cmd.stdout(Stdio::null());
                     cmd.stdout(Stdio::null());
+                } else if opt.instant_log {
+                    let out_name = format!("{name}.stdout");
+                    let file_stdout = File::create(out_name).unwrap();
+                    cmd.stdout(file_stdout);
+                    let name = format!("{name}.stderr");
+                    let file_stderr = File::create(name).unwrap();
+                    cmd.stderr(file_stderr);
                 }
                 cmd.stdin(Stdio::null());
 
@@ -196,20 +199,20 @@ fn main() {
                     .expect("failed to execute process");
 
                 
-                if !output.stdout.is_empty() && !opt.no_log && !opt.print
+                if !opt.instant_log && !output.stdout.is_empty() && !opt.no_log && !opt.print
                 {
                     let name = format!("{name}.stdout");
-                    let file = File::create(name)
+                    let file_stout = File::create(name)
                         .expect("unable to create file");
-                    let mut buf = BufWriter::new(file);
+                    let mut buf = BufWriter::new(file_stout);
                     buf.write_all(&output.stdout).unwrap();
                 }
 
-                if !output.stderr.is_empty() && !opt.no_log && !opt.print {
+                if !opt.instant_log && !output.stderr.is_empty() && !opt.no_log && !opt.print {
                     let name = format!("{name}.stderr");
-                    let file = File::create(name)
+                    let file_stderr = File::create(name)
                         .expect("unable to create file");
-                    let mut buf = BufWriter::new(file);
+                    let mut buf = BufWriter::new(file_stderr);
                     buf.write_all(&output.stderr).unwrap();  
                 }
 
@@ -375,7 +378,7 @@ pub struct Job{
     #[structopt(short, long)]
     pub move_back: bool,
 
-    /// ignore stdout and stderr of commands, don't create log files for that
+    /// ignore stdout and stderr of commands, don't create log files for that.
     #[structopt(short, long)]
     pub no_log: bool,
 
@@ -386,6 +389,10 @@ pub struct Job{
 
     /// Print output to stdout and stderr instead of creating a logfile 
     /// for each command
+    /// 
+    /// Note: print also writes output instantly, without buffering,
+    /// similar to the behavior one can get for the logfiles with the 
+    /// --instant-log flag
     #[structopt(long)]
     pub print: bool,
 
@@ -405,5 +412,12 @@ pub struct Job{
     /// Force the move of files even if the execution path was not 
     /// empty before executing any command
     #[structopt(long, short)]
-    pub force: bool
+    pub force: bool,
+
+    /// This way the output of the commands is written to the corresponding log files instantly 
+    /// (usual behavior: storing output in RAM until command finishes and flushing afterwards).
+    /// This will result in empty logfiles for commands that do not output anything,
+    /// as the programm has no way of knowing that in advance
+    #[structopt(long, short)]
+    pub instant_log: bool
 }
