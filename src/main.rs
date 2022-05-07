@@ -35,15 +35,36 @@ fn main() {
         ).collect();
     
     let exec_path = opt.execution_path
-        .clone()
+        .as_ref()
         .map(std::fs::canonicalize)
-        .map(|r| r.unwrap());
+        .map(
+            |r| 
+            {
+                match r {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("Requested execution path (either relative to calling dir or absolut): {:?}", opt.execution_path.as_ref().unwrap());
+                        eprintln!("Execution path error: {:#}", e);
+                        std::process::exit(1); 
+                    }
+                }
+            }
+        
+        );
 
     
     let exec_path_is_empty = exec_path.as_ref().map(
         |p|
         {
-            p.read_dir().expect("execution path does not exist!").next().is_none()
+            match p.read_dir()
+            {
+                Err(e) => {
+                    eprintln!("Requested execution path, expanded to absolut path: {:?}", p);
+                    eprintln!("Execution path error: {:#}", e);
+                    std::process::exit(1); 
+                },
+                Ok(mut d) => d.next().is_none()
+            }
         }
     );
 
