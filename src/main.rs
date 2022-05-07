@@ -104,7 +104,7 @@ fn main() {
 
     let mut replacer: Box<dyn FnMut (&Captures) -> String> = if opt.u64{
         Box::new(
-            move |_: &Captures|
+            |_: &Captures|
             {
                 let num = rng.gen::<u64>();
                 format!("{num}")
@@ -112,7 +112,7 @@ fn main() {
         )
     } else {
         Box::new(
-            move |_: &Captures|
+            |_: &Captures|
             {
                 let num = rng.gen::<u32>();
                 format!("{num}")
