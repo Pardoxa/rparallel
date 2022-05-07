@@ -5,12 +5,13 @@ use std::path::PathBuf;
 use std::{
     fs::File,
     io::{BufRead, BufReader, Write, BufWriter},
-    process::Command,
+    process::{Command, Stdio},
     path::Path
 };
 use rayon::prelude::*;
 use regex::{Regex, Captures};
 use rand::{SeedableRng, Rng};
+//use std::os::unix::io::{AsRawFd, FromRawFd};
 
 fn main() {
     let opt = Job::from_args();
@@ -179,7 +180,15 @@ fn main() {
                 if opt.print {
                     cmd.stdout(std::process::Stdio::inherit());
                     cmd.stderr(std::process::Stdio::inherit());
+                } else if opt.no_log {
+                    // let f = std::io::sink();
+                    // let fd = f.as_raw_fd();
+                    // // from_raw_fd is only considered unsafe if the file is used for mmap
+                    // let out = unsafe {Stdio::from_raw_fd(fd)};
+                    cmd.stdout(Stdio::null());
+                    cmd.stdout(Stdio::null());
                 }
+                cmd.stdin(Stdio::null());
 
                 let output = cmd.arg("-c")
                     .arg(command)
@@ -327,7 +336,9 @@ where P1: AsRef<Path>,
 /// 
 /// Used to run commands that are stored in a script in parallel.
 /// The order of the commands is not guaranteed.
-/// Commands are executed in shell (sh) not bash
+/// Commands are executed in shell (sh) not bash.
+/// 
+/// Commands are set to ignore standard input as there is no way to give them input.
 /// 
 /// Note: all occurences of §cwd§ will be replaced by the directory this program was called in!
 /// Also $RANDOM will be replaced with a randomly drawn u32 (unsigned 32bit integer)
